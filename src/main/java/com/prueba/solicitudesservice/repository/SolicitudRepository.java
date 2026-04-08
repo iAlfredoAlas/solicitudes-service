@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
 
@@ -27,5 +29,12 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     boolean existsOverlappingRequest(String employeeId,
                                      java.time.LocalDate startDate,
                                      java.time.LocalDate endDate);
+
+    @Query("""
+    SELECT s FROM Solicitud s
+    WHERE s.employeeId = :employeeId
+    AND YEAR(s.startDate) = :year
+    """)
+    List<Solicitud> findByEmployeeAndYear(String employeeId, int year);
 
 }
