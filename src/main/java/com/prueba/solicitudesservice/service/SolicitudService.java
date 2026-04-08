@@ -1,9 +1,11 @@
 package com.prueba.solicitudesservice.service;
 
 import com.prueba.solicitudesservice.entity.Solicitud;
+import com.prueba.solicitudesservice.exception.ApiException;
 import com.prueba.solicitudesservice.repository.SolicitudRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,12 +22,30 @@ public class SolicitudService {
     // CREAR SOLICITUD
     public Solicitud create(Solicitud solicitud) {
 
-        // Validar fechas
-        if (solicitud.getEndDate().isBefore(solicitud.getStartDate())) {
-            throw new RuntimeException("endDate no puede ser menor que startDate");
+        // VALIDACIONES OBLIGATORIAS (400)
+        if (solicitud.getEmployeeId() == null || solicitud.getEmployeeId().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "employeeId es obligatorio", "BAD_REQUEST");
         }
 
-        // Validar traslape
+        if (solicitud.getType() == null || solicitud.getType().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "type es obligatorio", "BAD_REQUEST");
+        }
+
+        if (solicitud.getStartDate() == null || solicitud.getEndDate() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "startDate y endDate son obligatorios", "BAD_REQUEST");
+        }
+
+        // VALIDAR TYPE
+        if (!solicitud.getType().equals("VACACIONES") && !solicitud.getType().equals("PERMISO")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "type inválido", "BAD_REQUEST");
+        }
+
+        // VALIDAR FECHAS
+        if (solicitud.getEndDate().isBefore(solicitud.getStartDate())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "endDate no puede ser menor que startDate", "BAD_REQUEST");
+        }
+
+        // VALIDAR TRASLAPE (409)
         boolean overlap = repository.existsOverlappingRequest(
                 solicitud.getEmployeeId(),
                 solicitud.getStartDate(),
@@ -33,29 +53,29 @@ public class SolicitudService {
         );
 
         if (overlap) {
-            throw new RuntimeException("Ya existe una solicitud en ese rango de fechas");
+            throw new ApiException(HttpStatus.CONFLICT, "Ya existe una solicitud en ese rango de fechas", "OVERLAP");
         }
 
-        // Calcular días
-        BigDecimal days = calculateDays(solicitud.getType(),
+        // CALCULAR DIAS
+        BigDecimal days = calculateDays(
+                solicitud.getType(),
                 solicitud.getStartDate(),
-                solicitud.getEndDate());
+                solicitud.getEndDate()
+        );
 
         solicitud.setDaysRequested(days);
 
-        // Validar límites
+        // VALIDAR LIMITES (400)
         if ("VACACIONES".equals(solicitud.getType()) && days.intValue() > 10) {
-            throw new RuntimeException("Vacaciones exceden máximo permitido");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Vacaciones exceden máximo permitido", "LIMIT_EXCEEDED");
         }
 
         if ("PERMISO".equals(solicitud.getType()) && days.intValue() > 5) {
-            throw new RuntimeException("Permiso excede máximo permitido");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Permiso excede máximo permitido", "LIMIT_EXCEEDED");
         }
 
-        // Set estado inicial
+        // SET DEFAULTS
         solicitud.setStatus("PENDIENTE");
-
-        // Fecha creación
         solicitud.setCreatedAt(LocalDateTime.now());
 
         return repository.save(solicitud);
@@ -64,9 +84,24 @@ public class SolicitudService {
     // LISTAR
     public Page<Solicitud> findByEmployee(String employeeId, String status, int page, int size) {
 
+        // validar employeeId
+        if (employeeId == null || employeeId.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "employeeId es obligatorio", "BAD_REQUEST");
+        }
+
+        // validar status
+        if (status != null && !status.isBlank()) {
+            if (!status.equals("PENDIENTE") &&
+                    !status.equals("APROBADA") &&
+                    !status.equals("RECHAZADA")) {
+
+                throw new ApiException(HttpStatus.BAD_REQUEST, "status inválido", "BAD_REQUEST");
+            }
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("startDate").descending());
 
-        if (status != null && !status.isEmpty()) {
+        if (status != null && !status.isBlank()) {
             return repository.findByEmployeeIdAndStatus(employeeId, status, pageable);
         }
 
@@ -77,10 +112,22 @@ public class SolicitudService {
     public Solicitud decision(Long id, String status, String comment) {
 
         Solicitud solicitud = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Solicitud no encontrada", "NOT_FOUND"));
 
+        // VALIDAR STATUS ENTRADA
+        if (status == null || status.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "status es obligatorio", "BAD_REQUEST");
+        }
+
+        if (!status.equals("APROBADA") && !status.equals("RECHAZADA")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "status inválido", "BAD_REQUEST");
+        }
+
+        // VALIDAR TRANSICION
         if (!"PENDIENTE".equals(solicitud.getStatus())) {
-            throw new RuntimeException("Solo solicitudes pendientes pueden cambiar estado");
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Solo solicitudes pendientes pueden cambiar estado",
+                    "INVALID_STATE");
         }
 
         solicitud.setStatus(status);
@@ -92,18 +139,30 @@ public class SolicitudService {
     // RESUMEN
     public SummaryResponse getSummary(String employeeId, int year) {
 
-        var solicitudes = repository.findAll().stream()
-                .filter(s -> s.getEmployeeId().equals(employeeId))
-                .filter(s -> s.getStartDate().getYear() == year)
-                .toList();
+        // VALIDACIONES (400)
+        if (employeeId == null || employeeId.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "employeeId es obligatorio", "BAD_REQUEST");
+        }
+
+        if (year <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "year inválido", "BAD_REQUEST");
+        }
+
+        var solicitudes = repository.findByEmployeeAndYear(employeeId, year);
 
         BigDecimal vacaciones = BigDecimal.ZERO;
         BigDecimal permisos = BigDecimal.ZERO;
 
         for (Solicitud s : solicitudes) {
+
+            // solo contar aprobadas
+            if (!"APROBADA".equals(s.getStatus())) continue;
+
             if ("VACACIONES".equals(s.getType())) {
                 vacaciones = vacaciones.add(s.getDaysRequested());
-            } else if ("PERMISO".equals(s.getType())) {
+            }
+
+            if ("PERMISO".equals(s.getType())) {
                 permisos = permisos.add(s.getDaysRequested());
             }
         }
@@ -111,7 +170,7 @@ public class SolicitudService {
         return new SummaryResponse(employeeId, year, vacaciones, permisos);
     }
 
-    // CÁLCULO DE DÍAS
+    // CALCULO DE DIAS
     private BigDecimal calculateDays(String type, LocalDate start, LocalDate end) {
 
         int days = 0;
