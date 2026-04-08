@@ -4,6 +4,8 @@ import com.prueba.solicitudesservice.entity.Solicitud;
 import com.prueba.solicitudesservice.service.SolicitudService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,19 +17,21 @@ public class SolicitudController {
 
     //  CREAR
     @PostMapping
-    public Solicitud create(@RequestBody Solicitud solicitud) {
-        return service.create(solicitud);
+    public ResponseEntity<Solicitud> create(@RequestBody Solicitud solicitud) {
+        Solicitud created = service.create(solicitud);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     //  LISTAR
     @GetMapping
-    public Page<Solicitud> list(
+    public ResponseEntity<Page<Solicitud>> list(
             @RequestParam String employeeId,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return service.findByEmployee(employeeId, status, page, size);
+        Page<Solicitud> result = service.findByEmployee(employeeId, status, page, size);
+        return ResponseEntity.ok(result);
     }
 
     //  APROBAR / RECHAZAR
