@@ -137,7 +137,7 @@ public class SolicitudService {
         return BigDecimal.valueOf(days);
     }
 
-    // DTO rápido para resumen
+    // DTO
     public record SummaryResponse(
             String employeeId,
             int year,
