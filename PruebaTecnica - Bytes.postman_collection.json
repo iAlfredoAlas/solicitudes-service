@@ -1,0 +1,132 @@
+{
+  "info": {
+    "_postman_id": "58c4c0e1-7651-4e02-8fde-7180d9b88e1a",
+    "name": "PruebaTecnica - Bytes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "25094058"
+  },
+  "item": [
+    {
+      "name": "solicitud-service",
+      "item": [
+        {
+          "name": "Crear Solicitud",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"employeeId\": \"A001\",\r\n  \"type\": \"PERMISO\",\r\n  \"startDate\": \"2026-04-21\",\r\n  \"endDate\": \"2026-04-27\",\r\n  \"reason\": \"test\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8081/api/requests",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "requests"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Solicitudes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/api/requests?employeeId=E001",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "requests"
+              ],
+              "query": [
+                {
+                  "key": "employeeId",
+                  "value": "E001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"status\": \"APROBADA\",\r\n  \"decisionComment\": \"OK\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8081/api/requests/2/decision",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "requests",
+                "2",
+                "decision"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/api/requests/summary?employeeId=E001&year=2026",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "requests",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "employeeId",
+                  "value": "E001"
+                },
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
